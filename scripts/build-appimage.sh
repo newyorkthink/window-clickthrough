@@ -26,17 +26,16 @@ if [[ ! -x "$linuxdeploy" ]]; then
   chmod +x "$linuxdeploy"
 fi
 
-rm -rf AppDir dist
+make clean
 mkdir -p AppDir dist
 
-make clean
 make all
 make DESTDIR="$project_root/AppDir" install
 
 export VERSION="$version"
 export OUTPUT="window-clickthrough-${version}-x86_64.AppImage"
 
-"$linuxdeploy" \
+"$linuxdeploy" --appimage-extract-and-run \
   --appdir AppDir \
   --executable build/window-clickthrough \
   --desktop-file packaging/window-clickthrough.desktop \
