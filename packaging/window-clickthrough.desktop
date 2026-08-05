@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Window Clickthrough
+Name[zh_CN]=窗口鼠标穿透
+Comment=Toggle mouse click-through for an X11 window
+Comment[zh_CN]=切换任意 X11 窗口的鼠标点击穿透
+Exec=window-clickthrough
+Icon=window-clickthrough
+Terminal=false
+NoDisplay=true
+Categories=Utility;
+Actions=Restore;
+
+[Desktop Action Restore]
+Name=Restore active window
+Name[zh_CN]=恢复当前穿透窗口
+Exec=window-clickthrough --restore

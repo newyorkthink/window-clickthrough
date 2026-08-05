@@ -1,0 +1,101 @@
+name: Build AppImage
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
+      - Makefile
+      - src/**
+      - tests/**
+      - scripts/build-appimage.sh
+      - packaging/**
+      - .github/workflows/build-appimage.yml
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish or update the release for the version in VERSION
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: window-clickthrough-appimage-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and test x86_64 AppImage
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            curl \
+            file \
+            libx11-dev \
+            libxext-dev \
+            x11-utils \
+            xdotool \
+            xvfb
+
+      - name: Validate version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build and run integration tests
+        run: make check
+
+      - name: Build AppImage
+        run: scripts/build-appimage.sh
+
+      - name: Create SHA-256 checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum "window-clickthrough-${{ steps.version.outputs.version }}-x86_64.AppImage" \
+            > "window-clickthrough-${{ steps.version.outputs.version }}-x86_64.AppImage.sha256"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: window-clickthrough-${{ steps.version.outputs.version }}-x86_64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub release
+        if: github.event_name == 'push' || inputs.publish_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* \
+              --target "$GITHUB_SHA" \
+              --title "window-clickthrough ${tag}" \
+              --notes-file CHANGELOG.md
+          fi
